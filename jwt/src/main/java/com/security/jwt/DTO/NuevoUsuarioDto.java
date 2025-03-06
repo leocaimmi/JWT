@@ -1,12 +1,10 @@
 package com.security.jwt.DTO;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
+@Getter
+@Setter
+@Builder
 public class NuevoUsuarioDto {
     private String nombre;
     private String password;

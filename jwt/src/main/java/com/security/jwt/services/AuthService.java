@@ -1,61 +1,52 @@
 package com.security.jwt.services;
 
 
-import com.security.jwt.DTO.NuevoUsuarioDto;
-import com.security.jwt.entities.Role;
+import com.security.jwt.DTO.LoginUsuarioDto;
 import com.security.jwt.entities.Usuario;
-import com.security.jwt.enums.RoleList;
-import com.security.jwt.jwt.JwtUtil;
 import com.security.jwt.repositories.RoleRepository;
-import jdk.swing.interop.SwingInterOpUtils;
+import com.security.jwt.repositories.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
 
-    private final UsuarioService usuarioService;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final UsuarioRepository usuarioRepository;
 
     @Autowired
-    public AuthService(UsuarioService usuarioService, RoleRepository roleRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, AuthenticationManager authenticationManager) {
-        this.usuarioService = usuarioService;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
+    public AuthService(UsuarioService usuarioService, RoleRepository roleRepository, PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager, UsuarioRepository usuarioRepository) {
         this.authenticationManager = authenticationManager;
+        this.usuarioRepository = usuarioRepository;
     }
 
-    public String authenticate(String nombreUsuario, String password){
-        // El nombreUsuario se valida con el UsuarioService, no es necesario acceder al UsuarioRepository directamente
-        if (!usuarioService.existeUsuario(nombreUsuario)) {
-            throw new IllegalArgumentException("Usuario no encontrado");
+    public Usuario authenticate(LoginUsuarioDto input) {
+        try {
+            // Busca al usuario en la base de datos por su email
+            Usuario usuarioEntidad= usuarioRepository.findByNombreUsuario(input.getNombre())
+                    .orElseThrow(() -> new UsernameNotFoundException("Email no fue encontrado en el sistema"));
+
+
+            // Autentica las credenciales utilizando el AuthenticationManager
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            input.getNombre(),
+                            input.getPassword()
+                    )
+            );
+            return usuarioEntidad;
+
+        } catch (BadCredentialsException ex) {
+            // Si las credenciales son incorrectas, lanza una excepción personalizada
+            throw new BadCredentialsException("Correo o contraseña incorrectos", ex);
+        } catch (Exception ex) {
+            throw new RuntimeException("Error en el proceso de autenticación", ex);
         }
-
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(nombreUsuario, password);
-        System.out.println(authenticationToken);
-        Authentication authResult = authenticationManager.authenticate(authenticationToken);
-
-        SecurityContextHolder.getContext().setAuthentication(authResult);
-        System.out.println("JOLFOSIANFOSAINFSAOIF");
-        System.out.println(jwtUtil.generateToken(authResult));
-        return jwtUtil.generateToken(authResult);
     }
 
-    public void register(NuevoUsuarioDto nuevoUsuarioDto){
-        if(usuarioService.existeUsuario(nuevoUsuarioDto.getNombre())){
-            throw new IllegalArgumentException("El nombre ya existe");
-        }
-        Role roleUsuario = roleRepository.findByNombre(RoleList.ROLE_USER).orElseThrow(() -> new RuntimeException("Rol no encontrado"));
-        Usuario usuario = new Usuario(nuevoUsuarioDto.getNombre(), passwordEncoder.encode(nuevoUsuarioDto.getPassword()), roleUsuario);
-        usuarioService.save(usuario);
-    }
 }

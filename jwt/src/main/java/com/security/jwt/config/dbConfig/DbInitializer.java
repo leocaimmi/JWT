@@ -1,7 +1,7 @@
 package com.security.jwt.config.dbConfig;
 
-import com.security.jwt.entities.Role;
-import com.security.jwt.enums.RoleList;
+import com.security.jwt.entities.RolEntidad;
+import com.security.jwt.enums.RolUsuarioEnum;
 import com.security.jwt.repositories.RoleRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +19,17 @@ public class DbInitializer {
 
     @PostConstruct
     public void init() {
-        initRoles();
+       // initRoles();
     }
     // Inicialización de Roles
     public void initRoles() {
-        // Se verifica si los roles del enum no están presentes en la base de datos y se guardan
-        for (RoleList role : RoleList.values()) {
-            if (roleRepository.findByNombre(role).isEmpty()) {
-                roleRepository.save(new Role(null, role)); // Se guarda un nuevo Role con el nombre del enum
-            }
+        if (roleRepository.findByNombre(RolUsuarioEnum.ADMINISTRADOR) == null) {
+            roleRepository.save(new RolEntidad(RolUsuarioEnum.ADMINISTRADOR));
         }
+        if (roleRepository.findByNombre(RolUsuarioEnum.USUARIO) == null) {
+            roleRepository.save(new RolEntidad(RolUsuarioEnum.USUARIO));
+        }
+
     }
+
 }
