@@ -1,61 +1,68 @@
 package com.security.jwt.services;
 
-
-import com.security.jwt.DTO.NuevoUsuarioDto;
-import com.security.jwt.entities.Role;
-import com.security.jwt.entities.Usuario;
-import com.security.jwt.enums.RoleList;
-import com.security.jwt.jwt.JwtUtil;
-import com.security.jwt.repositories.RoleRepository;
-import jdk.swing.interop.SwingInterOpUtils;
+import com.security.jwt.config.security.JwtService;
+import com.security.jwt.data.DTO.request.AuthenticationRequest;
+import com.security.jwt.data.DTO.response.AuthenticationResponse;
+import com.security.jwt.data.DTO.request.RegisterRequest;
+import com.security.jwt.model.Usuario;
+import com.security.jwt.repository.UsuarioRepository;
+import com.security.jwt.utils.Role;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
 
-    private final UsuarioService usuarioService;
-    private final RoleRepository roleRepository;
+    private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
     @Autowired
-    public AuthService(UsuarioService usuarioService, RoleRepository roleRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, AuthenticationManager authenticationManager) {
-        this.usuarioService = usuarioService;
-        this.roleRepository = roleRepository;
+    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService, AuthenticationManager authenticationManager) {
+        this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
+        this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
     }
 
-    public String authenticate(String nombreUsuario, String password){
-        // El nombreUsuario se valida con el UsuarioService, no es necesario acceder al UsuarioRepository directamente
-        if (!usuarioService.existeUsuario(nombreUsuario)) {
-            throw new IllegalArgumentException("Usuario no encontrado");
-        }
+    public AuthenticationResponse register(RegisterRequest request) {
+        Usuario usuario = Usuario.builder()
+                .nombre(request.getNombre())
+                .apellido(request.getApellido())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .rol(Role.USUARIO)
+                .build();
 
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(nombreUsuario, password);
-        System.out.println(authenticationToken);
-        Authentication authResult = authenticationManager.authenticate(authenticationToken);
+        usuarioRepository.save(usuario);
 
-        SecurityContextHolder.getContext().setAuthentication(authResult);
-        System.out.println("JOLFOSIANFOSAINFSAOIF");
-        System.out.println(jwtUtil.generateToken(authResult));
-        return jwtUtil.generateToken(authResult);
+        String token = jwtService.generateToken(usuario);
+
+        return AuthenticationResponse.builder()
+                .token(token)
+                .build();
     }
 
-    public void register(NuevoUsuarioDto nuevoUsuarioDto){
-        if(usuarioService.existeUsuario(nuevoUsuarioDto.getNombre())){
-            throw new IllegalArgumentException("El nombre ya existe");
-        }
-        Role roleUsuario = roleRepository.findByNombre(RoleList.ROLE_USER).orElseThrow(() -> new RuntimeException("Rol no encontrado"));
-        Usuario usuario = new Usuario(nuevoUsuarioDto.getNombre(), passwordEncoder.encode(nuevoUsuarioDto.getPassword()), roleUsuario);
-        usuarioService.save(usuario);
+    public String authenticate(AuthenticationRequest request) {
+
+        Usuario usuario = usuarioRepository.findByEmail(request.getUsername())
+                .orElseThrow(() -> new UsernameNotFoundException(request.getUsername()));
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsername(),
+                        request.getPassword()
+                )
+        );
+
+        return jwtService.generateToken(usuario);
+
+
     }
+
 }
+
